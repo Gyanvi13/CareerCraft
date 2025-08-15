@@ -11,7 +11,7 @@ load_dotenv()
 # Configure Gemini API
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 # Using a more recent and powerful model is often a good idea
-model = genai.GenerativeModel('gemini-1.5-pro-latest') 
+model = genai.GenerativeModel('gemini-2.5-flash') 
 
 
 def get_gemini_response(prompt):
