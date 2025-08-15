@@ -2,5 +2,5 @@ streamlit
 streamlit_extras
 google-generativeai
 python-dotenv
-pyPDF2
+PyPDF2
 Pillow
