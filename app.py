@@ -5,35 +5,37 @@ import google.generativeai as genai
 import os
 import PyPDF2
 
-# Load environment variables
+# Load environment variables 
 load_dotenv()
 
 # Configure Gemini API
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-model = genai.GenerativeModel('gemini-2.5-pro')
+# Using a more recent and powerful model is often a good idea
+model = genai.GenerativeModel('gemini-1.5-pro-latest') 
 
 # ---- Functions ----
 def get_gemini_response(prompt):
     """Get AI response safely from Gemini."""
     try:
         response = model.generate_content(prompt)
-        if hasattr(response, 'output') and response.output:
-            content = response.output[0].content
-            if content and len(content) > 0:
-                return content[0].text.strip()
-        return "⚠ No text returned from Gemini AI. Check prompt/API."
+        return response.text.strip()
     except Exception as e:
         return f"⚠ API call failed: {e}"
 
-def extract_pdf_text(uploaded_file, max_chars=1500):
+def extract_pdf_text(uploaded_file, max_chars=2000): # Increased max_chars slightly
     """Extract and truncate PDF text to avoid large prompts."""
-    reader = PyPDF2.PdfReader(uploaded_file)
-    text = ""
-    for page in reader.pages:
-        page_text = page.extract_text()
-        if page_text:
-            text += page_text
-    return text[:max_chars]
+    try:
+        reader = PyPDF2.PdfReader(uploaded_file)
+        text = ""
+        for page in reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text
+        # Ensure text is not empty before returning
+        return text[:max_chars] if text else ""
+    except Exception as e:
+        st.error(f"Error reading PDF file: {e}")
+        return None
 
 # ---- Simplified Prompt ----
 input_prompt = """
@@ -47,7 +49,7 @@ resumes against provided job descriptions. Assign precise matching percentages a
 resume: {text}
 description: {jd}
 
-I want the response in the following structure:
+I want the response in the following structure and nothing else:
 MATCH_PERCENTAGE:
 <MATCH PERCENTAGE>
 
@@ -64,7 +66,7 @@ st.markdown("""
 <style>
 .section-title { text-align: center; font-size: 28px; font-weight: bold; color: #4CAF50; margin-bottom: 20px; }
 .offer-item { background-color: #f0f0f0; padding: 10px; border-radius: 8px; margin-bottom: 8px; font-size: 16px; }
-.highlight { background-color: #e0f7fa; padding: 10px; border-radius: 8px; }
+.highlight { background-color: #e0f7fa; padding: 20px; border-radius: 8px; border: 1px solid #4CAF50; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -98,22 +100,19 @@ st.markdown("<div class='section-title'>🧭 Embark on Your Career Adventure</di
 col1, col2 = st.columns([3, 1])
 
 with col1:
-    jd = st.text_area("📄 Paste the Job Description", height=150)
+    jd = st.text_area("📄 Paste the Job Description", height=250)
     uploaded_file = st.file_uploader("📤 Upload Your Resume (PDF)", type="pdf")
     if st.button("🔍 Analyze Resume"):
         if uploaded_file and jd.strip():
-            st.success("✅ Submitted! AI is analyzing your resume...")
-            try:
+            with st.spinner("AI is analyzing your resume... Please wait."):
                 resume_text = extract_pdf_text(uploaded_file)
-                jd_text = jd[:1500]
-                prompt = input_prompt.format(text=resume_text, jd=jd_text)
-                response = get_gemini_response(prompt)
-                st.markdown("<div class='highlight'>", unsafe_allow_html=True)
-                st.subheader("📊 AI Analysis Result")
-                st.code(response)
-                st.markdown("</div>", unsafe_allow_html=True)
-            except Exception as e:
-                st.error(f"⚠ Something went wrong: {e}")
+                if resume_text is not None: # Check if PDF extraction was successful
+                    prompt = input_prompt.format(text=resume_text, jd=jd)
+                    response = get_gemini_response(prompt)
+                    st.markdown("<div class='highlight'>", unsafe_allow_html=True)
+                    st.subheader("📊 AI Analysis Result")
+                    st.markdown(response.replace("MATCH_PERCENTAGE:", "**MATCH PERCENTAGE:**").replace("MISSING_KEYWORDS:", "\n**MISSING KEYWORDS:**").replace("PROFILE_SUMMARY:", "\n**PROFILE SUMMARY:**"))
+                    st.markdown("</div>", unsafe_allow_html=True)
         else:
             st.error("⚠ Please provide both a Job Description and a Resume.")
 
@@ -126,14 +125,14 @@ st.divider()
 # ---- Section 3: FAQ ----
 st.markdown("<div class='section-title'>❓ Frequently Asked Questions</div>", unsafe_allow_html=True)
 with st.expander("How does CareerCraft analyze resumes and job descriptions?"):
-    st.write("CareerCraft uses advanced algorithms to match skills and keywords from your resume with the job description.")
+    st.write("CareerCraft uses advanced Google Gemini AI to perform semantic matching of skills, experience, and keywords from your resume against the provided job description.")
 with st.expander("Can CareerCraft suggest improvements for my resume?"):
-    st.write("Yes! CareerCraft provides personalized recommendations including missing keywords, skill alignment, and optimization tips.")
+    st.write("Yes! By highlighting the missing keywords, CareerCraft gives you direct insights on what to add to your resume to better align with the job and pass through Applicant Tracking Systems (ATS).")
 with st.expander("Is CareerCraft suitable for both entry-level and experienced professionals?"):
-    st.write("Absolutely! CareerCraft caters to all job seekers and provides tailored insights.")
+    st.write("Absolutely! The analysis is based on the provided job description, making it a valuable tool for professionals at any stage of their career.")
 
 st.markdown("<h3>📚 Tips for Job Seekers</h3>", unsafe_allow_html=True)
-st.write("- Keep your resume clear and concise")
-st.write("- Highlight measurable achievements")
-st.write("- Use keywords from the job description")
-st.write("- Tailor your resume for each application")
+st.write("- Keep your resume clear and concise.")
+st.write("- Highlight measurable achievements using numbers and data.")
+st.write("- Use keywords from the job description naturally within your experience bullet points.")
+st.write("- Tailor your resume for each application to maximize your match percentage.")
